@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>МУХА-ИБ v4.0 · Мозг мухи защищает IoT</title>
+<style>
+/* ===== ПЕРЕМЕННЫЕ ===== */
+:root{
+  --bg:#050b14; --panel:#0a1522; --panel2:#0d1b2c; --line:#17324b;
+  --text:#e6f1f7; --muted:#8aa5b8;
+  --cyan:#22d3ee; --blue:#60a5fa; --violet:#a78bfa; --teal:#2dd4bf;
+  --green:#34d399; --red:#fb7185; --amber:#fbbf24;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:15px/1.5 var(--sans);display:flex;flex-direction:column;height:100vh;overflow:hidden}
+button{font-family:inherit}
+
+/* ===== ШАПКА И ШАГИ ===== */
+header{flex-shrink:0;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
+.logo .tag{font:700 12px var(--mono);background:var(--cyan);color:#021018;padding:2px 8px;border-radius:5px}
+.logo .sub{color:var(--muted);font-weight:400;font-size:13px}
+.hdr-right{display:flex;gap:8px;align-items:center}
+.seed{font:12px var(--mono);color:var(--muted)}
+
+.stepper{flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:0;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
+.step{display:flex;align-items:center;gap:8px;padding:6px 10px;border:0;background:none;color:var(--muted);cursor:default;border-radius:8px;white-space:nowrap}
+.step .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:700 12px var(--mono);border:1.5px solid var(--line)}
+.step .t{font-size:13px;font-weight:600}
+.step.reach{cursor:pointer;color:var(--text)}
+.step.reach:hover{background:rgba(34,211,238,.08)}
+.step.done .n{border-color:var(--green);color:var(--green)}
+.step.active .n{border-color:var(--cyan);color:#021018;background:var(--cyan);box-shadow:0 0 14px rgba(34,211,238,.5)}
+.step.active .t{color:var(--cyan)}
+.bar-sep{width:18px;height:1px;background:var(--line)}
+.bar-sep.done{background:var(--green)}
+@media(max-width:700px){.step .t{display:none}}
+
+/* ===== ОСНОВНАЯ СЕТКА ===== */
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.6fr) minmax(400px,1fr)}
+@media(max-width:1000px){main{grid-template-columns:1fr;grid-template-rows:42vh 1fr}}
+#stage{position:relative;overflow:hidden;background:#02060d;border-right:1px solid var(--line);min-height:0}
+@media(max-width:1000px){#stage{border-right:0;border-bottom:1px solid var(--line)}}
+#brain{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#brain:active{cursor:grabbing}
+.status{position:absolute;top:14px;left:16px;display:flex;align-items:center;gap:9px;padding:7px 14px;border-radius:999px;background:rgba(5,11,20,.85);border:1px solid var(--line);font:700 12px var(--mono);letter-spacing:.5px;backdrop-filter:blur(8px)}
+.status i{width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+.legend{position:absolute;left:16px;bottom:14px;display:grid;gap:4px;padding:10px 14px;border-radius:12px;background:rgba(5,11,20,.85);border:1px solid var(--line);font-size:12px;color:var(--muted);backdrop-filter:blur(8px)}
+.legend div{display:flex;align-items:center;gap:8px;transition:color .3s}
+.legend div.on{color:var(--text)}
+.legend b{width:9px;height:9px;border-radius:50%}
+.counter{position:absolute;right:16px;bottom:14px;padding:8px 14px;border-radius:12px;background:rgba(5,11,20,.85);border:1px solid var(--line);font:12px var(--mono);color:var(--muted);display:grid;gap:2px;backdrop-filter:blur(8px)}
+.counter b{color:var(--cyan);float:right;margin-left:14px}
+@media(max-width:1000px){.legend{display:none}}
+.tip{position:absolute;pointer-events:none;opacity:0;transition:opacity .15s;padding:9px 12px;border-radius:10px;background:rgba(5,11,20,.96);border:1px solid var(--cyan);font-size:12px;max-width:240px;z-index:5}
+.tip.on{opacity:1}
+.tip b{display:block;font-size:13px;margin-bottom:2px}
+.tip span{color:var(--muted)}
+
+/* ===== ПРАВАЯ ПАНЕЛЬ ===== */
+#panel{overflow-y:auto;padding:18px 20px;background:var(--bg);min-height:0}
+.head{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
+.head .num{font:800 26px var(--mono);color:var(--cyan)}
+.head .title{font-size:19px;font-weight:800}
+.lead{color:var(--muted);margin-bottom:14px}
+.stack{display:grid;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.card h3{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--cyan)}
+.live{font:700 10px var(--mono);color:var(--green);border:1px solid rgba(52,211,153,.5);padding:1px 7px;border-radius:5px}
+.note{color:var(--muted);font-size:13px;margin-top:8px}
+
+/* чипы-источники */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chip{padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:13px;cursor:pointer;min-height:36px}
+.chip:hover{border-color:var(--cyan)}
+.chip.on{background:rgba(34,211,238,.16);border-color:var(--cyan);color:var(--cyan)}
+.chip.atk.on{background:rgba(251,113,133,.16);border-color:var(--red);color:var(--red)}
+
+/* строки признаков */
+.feat{display:grid;grid-template-columns:150px 1fr 64px;gap:10px;align-items:center;font-size:13px;margin-bottom:7px}
+.feat .fn{color:var(--muted)} .feat .fv{font:600 13px var(--mono);text-align:right}
+.meter{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .35s}
+@media(max-width:520px){.feat{grid-template-columns:110px 1fr 54px}}
+
+.chart{height:96px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);position:relative;overflow:hidden}
+.chart canvas{width:100%;height:100%;display:block}
+.chart .lbl{position:absolute;left:10px;top:6px;font-size:11px;color:var(--muted);pointer-events:none}
+
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-top:10px}
+.metric{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.metric small{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.metric b{font:800 18px var(--mono);color:var(--cyan)}
+.metric.good b{color:var(--green)} .metric.bad b{color:var(--red)} .metric.warn b{color:var(--amber)}
+
+/* сетка KC */
+.kcgrid{display:grid;grid-template-columns:repeat(20,1fr);gap:2px;padding:8px;border-radius:10px;background:var(--panel2);border:1px solid var(--line)}
+.kcgrid i{aspect-ratio:1;border-radius:2px;background:rgba(96,165,250,.12)}
+.kcgrid i.on{background:var(--blue);box-shadow:0 0 6px var(--blue)}
+.kcgrid i.mem{background:rgba(167,139,250,.35)}
+.kcgrid i.mem.on{background:var(--red);box-shadow:0 0 6px var(--red)}
+.keys{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--muted)}
+.keys span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;background:var(--c)}
+
+/* индикатор новизны */
+.gauge{position:relative;height:26px;border-radius:13px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;margin:8px 0}
+.gauge .fill{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--amber),var(--red));background-size:var(--gw,400px) 100%;transition:width .3s}
+.gauge .thr{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 6px #fff}
+.gauge .val{position:absolute;inset:0;display:grid;place-items:center;font:800 12px var(--mono);text-shadow:0 0 4px #000}
+
+.verdict{padding:16px;border-radius:14px;text-align:center;border:1px solid var(--line);background:var(--panel);transition:all .25s}
+.verdict .big{font:800 26px var(--mono);letter-spacing:1px}
+.verdict .small{font-size:13px;color:var(--muted)}
+.verdict.safe{border-color:var(--green);background:rgba(52,211,153,.08)} .verdict.safe .big{color:var(--green)}
+.verdict.danger{border-color:var(--red);background:rgba(251,113,133,.1)} .verdict.danger .big{color:var(--red)}
+
+.progress{height:20px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);position:relative;overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .2s}
+.progress span{position:absolute;inset:0;display:grid;place-items:center;font:700 11px var(--mono);text-shadow:0 0 4px #000}
+
+.log{background:#02060d;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font:12px/1.55 var(--mono);height:132px;overflow-y:auto;color:var(--cyan)}
+.log div.ok{color:var(--green)} .log div.bad{color:var(--red)} .log div.warn{color:var(--amber)}
+
+.confusion{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.confusion div{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center}
+.confusion small{display:block;font-size:11px;color:var(--muted)}
+.confusion b{font:800 20px var(--mono)}
+.confusion .tp b,.confusion .tn b{color:var(--green)} .confusion .fp b{color:var(--amber)} .confusion .fn b{color:var(--red)}
+
+.slider{display:grid;gap:4px}
+.slider label{display:flex;justify-content:space-between;font-size:13px}
+.slider label b{font-family:var(--mono);color:var(--cyan)}
+input[type=range]{width:100%;accent-color:var(--cyan);height:28px}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:520px){.two{grid-template-columns:1fr}}
+.list{list-style:none;display:grid;gap:6px;font-size:13px}
+.list li{padding-left:18px;position:relative}
+.list li::before{content:"";position:absolute;left:2px;top:8px;width:7px;height:7px;border-radius:50%;background:var(--c,var(--cyan))}
+
+/* ===== КНОПКИ ===== */
+.actions{flex-shrink:0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:10px 16px;background:var(--panel);border-top:1px solid var(--line)}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 20px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--muted);font:700 13px var(--mono);letter-spacing:.4px;text-transform:uppercase;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.btn:hover:not(:disabled){transform:translateY(-1px);color:var(--text);border-color:var(--cyan)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{background:var(--cyan);color:#021018;border-color:var(--cyan);box-shadow:0 0 16px rgba(34,211,238,.35)}
+.btn.primary:hover:not(:disabled){color:#021018;box-shadow:0 0 26px rgba(34,211,238,.6)}
+.btn.small{min-height:36px;padding:0 12px;font-size:12px}
+.btn.atk{color:var(--red);border-color:rgba(251,113,133,.5)}
+.btn:focus-visible,.chip:focus-visible,.step:focus-visible,input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span class="tag">v4.0</span><span>МУХА-ИБ</span><span class="sub">мозг мухи защищает IoT</span></div>
+  <div class="hdr-right">
+    <span class="seed" id="seedLabel"></span>
+    <button class="btn small" id="btnNew" title="Другой случайный мозг">🎲 Новый мозг</button>
+    <button class="btn small" id="btnReset">⟳ Сначала</button>
+  </div>
+</header>
+
+<nav class="stepper" id="stepper" aria-label="Этапы"></nav>
+
+<main>
+  <section id="stage">
+    <canvas id="brain" aria-label="3D-модель мозга мухи"></canvas>
+    <div class="status" id="status"><i></i><span id="statusText">ОЖИДАНИЕ</span></div>
+    <div class="legend" id="legend"></div>
+    <div class="counter">
+      <div>Нейронов <b id="cNeurons">—</b></div>
+      <div>Hub-нейронов <b id="cHubs">—</b></div>
+      <div>Активных KC <b id="cKc">—</b></div>
+    </div>
+    <div class="tip" id="tip"></div>
+  </section>
+  <section id="panel"></section>
+</main>
+
+<div class="actions" id="actions"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   ЧАСТЬ 1. МОДЕЛЬ (математика мозга) — не зависит от экрана
+   ===================================================================== */
+/* ==MODEL-START== */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let rand = mulberry32(2024);
+function setSeed(s) { rand = mulberry32(s); }
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = rand();
+  while (v === 0) v = rand();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+const N_ORN = 40, N_KC = 400, KC_ACTIVE = 20, KC_FAN_IN = 8, N_INFO = 6;
+
+const FEATURES = [
+  { name: 'Соединений в минуту', scale: 300 },
+  { name: 'Размер пакета, байт', scale: 1500 },
+  { name: 'Энтропия данных, бит', scale: 8 },
+  { name: 'Доля исходящего', scale: 1 },
+  { name: 'Доля ошибок', scale: 1 },
+  { name: 'Уникальных портов', scale: 1000 }
+];
+const SOURCES = {
+  camera:   { label: 'Камера',        truth: 'SAFE' },
+  lock:     { label: 'Умный замок',   truth: 'SAFE' },
+  hub:      { label: 'Хаб',           truth: 'SAFE' },
+  portscan: { label: 'Скан портов',   truth: 'DANGER' },
+  exfil:    { label: 'Утечка данных', truth: 'DANGER' },
+  beacon:   { label: 'Маяк C2',       truth: 'DANGER' }
+};
+const BASE = {
+  camera: [12, 800, 4.1, 0.90, 0.05, 3],
+  lock:   [2, 120, 3.2, 0.95, 0.02, 2],
+  hub:    [25, 400, 5.0, 0.70, 0.20, 8]
+};
+const PROFILES = ['camera', 'lock', 'hub'];
+
+const IoT = {
+  noise: {},
+  reset() {
+    for (const p of PROFILES)
+      this.noise[p] = Float32Array.from({ length: N_ORN - N_INFO }, () => Math.abs(randn()) * 0.3);
+  },
+  normal(p) {
+    const s = new Float32Array(N_ORN);
+    for (let i = 0; i < N_INFO; i++) s[i] = Math.max(0, BASE[p][i] * (1 + randn() * 0.08));
+    for (let i = N_INFO; i < N_ORN; i++) s[i] = Math.max(0, this.noise[p][i - N_INFO] * (1 + randn() * 0.08));
+    return s;
+  },
+  attack(kind) {
+    const s = new Float32Array(N_ORN);
+    let v;
+    if (kind === 'portscan') v = [200 + randn() * 30, 60 + randn() * 15, 7.8 + randn() * 0.2, 0.3, 0.4, 800 + randn() * 50];
+    else if (kind === 'exfil') v = [15 + randn() * 3, 1400 + randn() * 100, 7.9 + randn() * 0.05, 0.98, 0.01, 1];
+    else v = [0.2 + randn() * 0.05, 100 + randn() * 10, 6.5 + randn() * 0.2, 0.9, 0.05, 1];
+    for (let i = 0; i < N_INFO; i++) s[i] = Math.max(0, v[i]);
+    for (let i = N_INFO; i < N_ORN; i++) s[i] = Math.abs(randn()) * 0.3;
+    return s;
+  },
+  sample(src) { return BASE[src] ? this.normal(src) : this.attack(src); }
+};
+
+const FlyBrain = {
+  W: null, mem: null, mu: null, x: null, orn: null, kcIdx: [], novelty: 1,
+  init() {
+    this.W = [];
+    for (let i = 0; i < N_KC; i++) {
+      const used = new Set(), inputs = [];
+      while (inputs.length < KC_FAN_IN) {
+        const idx = Math.floor(rand() * N_ORN);
+        if (used.has(idx)) continue;
+        used.add(idx);
+        inputs.push({ idx, w: randn() });
+      }
+      this.W.push(inputs);
+    }
+    this.forget();
+    this.x = new Float32Array(N_ORN);
+    this.orn = new Float32Array(N_ORN);
+  },
+  forget() { this.mu = new Float32Array(N_ORN); this.nSeen = 0; this.mem = new Float32Array(N_KC).fill(1); this.kcIdx = []; this.novelty = 1; },
+  encode(raw) {
+    const x = new Float32Array(N_ORN);
+    for (let i = 0; i < N_ORN; i++) {
+      const scale = i < N_INFO ? FEATURES[i].scale : 5;
+      x[i] = clamp(Math.log1p(raw[i]) / Math.log1p(scale), 0, 1.5);
+    }
+    return x;
+  },
+  run(raw) {
+    this.x = this.encode(raw);
+    let mean = 0;
+    for (const v of this.x) mean += v;
+    mean /= N_ORN;
+    const gain = 0.3 + mean;
+    this.orn = this.x.map((v, i) => (v - this.mu[i]) / gain);
+    const act = new Float32Array(N_KC);
+    for (let i = 0; i < N_KC; i++) {
+      let s = 0;
+      for (const { idx, w } of this.W[i]) s += this.orn[idx] * w;
+      act[i] = s;
+    }
+    this.kcIdx = [...Array(N_KC).keys()].sort((a, b) => act[b] - act[a]).slice(0, KC_ACTIVE);
+    let sum = 0;
+    for (const j of this.kcIdx) sum += this.mem[j];
+    this.novelty = sum / KC_ACTIVE;
+    return this.novelty;
+  },
+  learn(rate = 0.5) {
+    this.nSeen++;
+    const a = Math.max(0.02, 1 / this.nSeen);
+    for (let i = 0; i < N_ORN; i++) this.mu[i] += a * (this.x[i] - this.mu[i]);
+    for (const j of this.kcIdx) this.mem[j] *= (1 - rate); },
+  memoryUsed() { let n = 0; for (const m of this.mem) if (m < 0.5) n++; return n; }
+};
+
+function trainEpoch(perProfile) {
+  for (const p of PROFILES) for (let k = 0; k < perProfile; k++) { FlyBrain.run(IoT.normal(p)); FlyBrain.learn(0.5); }
+}
+function calibrateThreshold(valScores) {
+  const s = [...valScores].sort((a, b) => a - b);
+  const p95 = s[Math.min(s.length - 1, Math.floor(s.length * 0.95))];
+  return clamp(p95 + 0.1, 0.15, 0.6);
+}
+/* ==MODEL-END== */
+
+
+/* =====================================================================
+   ЧАСТЬ 2. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+function hexToRgb(h){ const m=h.match(/[0-9a-f]{2}/gi); return m.map(x=>parseInt(x,16)); }
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(rand()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+const fmt = v => v>=100 ? String(Math.round(v)) : v>=1 ? v.toFixed(1) : v.toFixed(2);
+
+/* Таймеры: всё запускаемое на этапе будет остановлено при смене этапа */
+const TIMER = {
+  ids:new Set(),
+  every(fn,ms){ const id=setInterval(fn,ms); this.ids.add(id); return id; },
+  clear(){ this.ids.forEach(clearInterval); this.ids.clear(); }
+};
+let runId = 0; // «номер запуска»: если этап сменился, старые async-циклы сами останавливаются
+
+/* Графики на canvas: линия и столбики */
+function prepCanvas(c){
+  const dpr=window.devicePixelRatio||1, w=c.clientWidth, h=c.clientHeight;
+  if(c.width!==w*dpr||c.height!==h*dpr){ c.width=w*dpr; c.height=h*dpr; }
+  const g=c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  return {g,w,h};
+}
+function drawLine(id, series, {min=0,max=1,colors=['#34d399'],refLine=null}={}){
+  const c=$(id); if(!c) return;
+  const {g,w,h}=prepCanvas(c), top=20, bot=8;
+  const Y=v=>top+(1-(v-min)/((max-min)||1))*(h-top-bot);
+  g.strokeStyle='rgba(34,211,238,.1)'; g.lineWidth=1;
+  for(let i=1;i<4;i++){ const y=top+(i/4)*(h-top-bot); g.beginPath(); g.moveTo(0,y); g.lineTo(w,y); g.stroke(); }
+  if(refLine!=null){ g.setLineDash([4,4]); g.strokeStyle='rgba(255,255,255,.55)'; g.beginPath(); g.moveTo(0,Y(refLine)); g.lineTo(w,Y(refLine)); g.stroke(); g.setLineDash([]); }
+  series.forEach((data,si)=>{
+    if(!data.length) return;
+    g.beginPath();
+    data.forEach((v,i)=>{ const x=6+(i/Math.max(1,data.length-1))*(w-12); i?g.lineTo(x,Y(v)):g.moveTo(x,Y(v)); });
+    g.strokeStyle=colors[si]; g.lineWidth=2; g.stroke();
+    const lx=w-6, ly=Y(data[data.length-1]); g.fillStyle=colors[si]; g.beginPath(); g.arc(lx,ly,3.5,0,7); g.fill();
+  });
+}
+function drawBars(id, values, hi){
+  const c=$(id); if(!c) return;
+  const {g,w,h}=prepCanvas(c), n=values.length, bw=(w-12)/n;
+  const max=Math.max(1,...values.map(Math.abs));
+  values.forEach((v,i)=>{
+    const bh=(Math.abs(v)/max)*(h-26);
+    g.fillStyle = i<hi ? '#22d3ee' : 'rgba(96,165,250,.55)';
+    g.fillRect(6+i*bw+1, h-6-bh, Math.max(1,bw-2), bh);
+  });
+}
+
+/* =====================================================================
+   ЧАСТЬ 3. 3D-МОЗГ 
+   ===================================================================== */
+const GROUPS = {
+  ant:    {color:'#a5e8f5', title:'Антенны',                  role:'приём 40 признаков трафика'},
+  al:     {color:'#22d3ee', title:'Antennal Lobe',            role:'выравнивание «громкости» входа'},
+  calyx:  {color:'#60a5fa', title:'Mushroom Body · Calyx',    role:'разреженный код: 20 из 400'},
+  mblobes:{color:'#a78bfa', title:'Mushroom Body · Lobes',    role:'память: знакомо или ново'},
+  lh:     {color:'#2dd4bf', title:'Lateral Horn',             role:'врождённые реакции (для наглядности)'},
+  cx:     {color:'#34d399', title:'Central Complex',          role:'вердикт: сравнение с порогом'},
+  fill:   {color:'#1e3a5f', title:'Фоновый нейрон',           role:'поддержка связности'}
+};
+const LEGEND = [['ant','Антенны · вход'],['al','Antennal Lobe · нормализация'],['calyx','Calyx · Kenyon cells'],['mblobes','MB Lobes · память'],['lh','Lateral Horn'],['cx','Central Complex · вердикт']];
+
+const Brain3D = {
+  rotation:.35, rotSpeed:.11, tilt:-.2, tiltEff:-.2, pxu:4.5, camZ:360, W:0, H:0,
+  neurons:[], hubs:[], dust:[], motes:[], tracts:[], intra:[], regions:[], packets:[],
+  proj:[], dproj:[], mproj:[], activity:{}, target:{}, flash:null, flashUntil:0, hover:-1, sprites:{},
+
+  /* ---------- СБОРКА МОДЕЛИ ---------- */
+  buildModel(){
+    const R=rand;
+    this.neurons=[]; this.hubs=[]; this.dust=[]; this.motes=[]; this.tracts=[]; this.intra=[]; this.regions=[]; this.packets=[];
+    for(const g in GROUPS){ this.activity[g]=.1; this.target[g]=.1; }
+    const hubNames={ant:'Ant',al:'AL',lh:'LH',calyx:'KC',mblobes:'MBON',cx:'CX'};
+    const reg={};
+    const add=(id,group,x,y,z,hub)=>{
+      const nm = hub ? hubNames[group]+'-'+((reg[id]?reg[id].hubs:0)+1) : undefined;
+      this.neurons.push({x,y,z,region:id,group,size:hub?3.4+R()*.6:1+R()*.8,phase:R()*6.28,hub:!!hub,name:nm});
+      const i=this.neurons.length-1; const r=(reg[id] ||= {group,idx:[],hubs:0}); r.idx.push(i);
+      if(hub){ r.hubs++; this.hubs.push({idx:i,regionId:id,group}); }
+    };
+    const ball=()=>{ let x,y,z; do{x=R()*2-1;y=R()*2-1;z=R()*2-1;}while(x*x+y*y+z*z>1); return [x,y,z]; };
+    const sph=()=>{ let x,y,z,l; do{x=R()*2-1;y=R()*2-1;z=R()*2-1;l=Math.hypot(x,y,z);}while(l<.2||l>1); return [x/l,y/l,z/l]; };
+    const bez=(p,t)=>{ const m=1-t; return [0,1,2].map(k=>m*m*m*p[0][k]+3*m*m*t*p[1][k]+3*m*t*t*p[2][k]+t*t*t*p[3][k]); };
+
+    for(const s of [-1,1]){
+      const sd = s<0?'L':'R';
+      // Антенны: изогнутая линия снаружи вперёд
+      const antP=[[s*50,-60,108],[s*42,-54,98],[s*32,-44,88],[s*24,-34,80]];
+      for(let i=0;i<14;i++){ const p=bez(antP,i/13); add('ant'+sd,'ant',p[0]+(R()-.5)*2,p[1]+(R()-.5)*2,p[2]+(R()-.5)*2, i===7); }
+      // Antennal Lobe: шар из «клубочков» на поверхности
+      for(let i=0;i<30;i++){ const [x,y,z]=sph(), r=12*(.85+.15*R()); add('al'+sd,'al',s*20+x*r,-26+y*r,58+z*r); }
+      for(let i=0;i<2;i++) add('al'+sd,'al',s*20+(R()-.5)*8,-26+(R()-.5)*8,58+(R()-.5)*8,true);
+      // Calyx: «шапка гриба» — приплюснутый эллипсоид
+      for(let i=0;i<64;i++){ const [x,y,z]=ball(); add('cal'+sd,'calyx',s*32+x*20,40+y*13,-14+z*20); }
+      add('cal'+sd,'calyx',s*36,44,-14,true); add('cal'+sd,'calyx',s*26,38,-8,true);
+      // Ножка гриба (KC-аксоны)
+      const pedP=[[s*30,30,-14],[s*28,10,-4],[s*22,-8,10],[s*18,-24,20]];
+      for(let i=0;i<22;i++){ const p=bez(pedP,i/21); add('ped'+sd,'calyx',p[0]+(R()-.5)*5,p[1]+(R()-.5)*5,p[2]+(R()-.5)*5); }
+      // Доли гриба: альфа (вверх) и бета (к центру)
+      const alP=[[s*18,-24,20],[s*16,-12,30],[s*14,4,38],[s*14,18,36]];
+      const beP=[[s*18,-24,20],[s*12,-28,26],[s*6,-30,32],[s*2,-30,34]];
+      for(let i=0;i<16;i++){ const p=bez(alP,i/15); add('mbl'+sd,'mblobes',p[0]+(R()-.5)*5,p[1]+(R()-.5)*5,p[2]+(R()-.5)*5, i===13); }
+      for(let i=0;i<14;i++){ const p=bez(beP,i/13); add('mbl'+sd,'mblobes',p[0]+(R()-.5)*5,p[1]+(R()-.5)*5,p[2]+(R()-.5)*5, i===11); }
+      // Lateral Horn
+      for(let i=0;i<22;i++){ const [x,y,z]=ball(); add('lh'+sd,'lh',s*48+x*9,8+y*10,24+z*12); }
+      add('lh'+sd,'lh',s*48,10,24,true); add('lh'+sd,'lh',s*46,4,28,true);
+    }
+    // Central Complex: кольцо + «мост»
+    for(let i=0;i<30;i++){ const a=i/30*6.283, r=15+(R()-.5)*3; add('cx','cx',r*Math.cos(a),2+r*Math.sin(a)*.85,-6+(R()-.5)*4); }
+    for(let i=0;i<12;i++){ add('cx','cx',-24+i*(48/11)+(R()-.5)*2,24+(R()-.5)*3,-8+(R()-.5)*3); }
+    for(let i=0;i<4;i++){ const a=i/4*6.283+.4; add('cx','cx',15*Math.cos(a),2+15*Math.sin(a)*.85,-6,true); }
+
+    // Силуэт: оболочка мозга + оптические доли (облако точек)
+    for(let i=0;i<1100;i++){
+      const [x,y,z]=sph(); let yy=y*46+2; if(yy>0) yy-=9*Math.exp(-Math.pow(x*60/12,2));
+      this.dust.push({x:x*60,y:yy,z:z*62-4,nx:x,ny:y,nz:z,a:.5+R()*.3,s:1.2+R()*1.3,ph:R()*6.28});
+    }
+    for(const s of [-1,1]) for(let i=0;i<260;i++){
+      const [x,y,z]=i<200?sph():ball(); const k=i<200?1:.7;
+      this.dust.push({x:s*74+x*14*k,y:y*24*k,z:-8+z*26*k,nx:i<200?x:0,ny:i<200?y:0,nz:i<200?z:0,a:.5+R()*.3,s:1.2+R()*1.3,ph:R()*6.28});
+    }
+    for(let i=0;i<55;i++){ const [x,y,z]=ball(); this.motes.push({x:x*118,y:y*90,z:z*118,vx:(R()-.5)*3,vy:(R()-.5)*3,vz:(R()-.5)*3}); }
+
+    // Регионы (для мягкого свечения)
+    for(const id in reg){ const r=reg[id]; let cx=0,cy=0,cz=0; for(const i of r.idx){ cx+=this.neurons[i].x; cy+=this.neurons[i].y; cz+=this.neurons[i].z; }
+      const n=r.idx.length; cx/=n;cy/=n;cz/=n; let rad=0; for(const i of r.idx){ const q=this.neurons[i]; rad=Math.max(rad,Math.hypot(q.x-cx,q.y-cy,q.z-cz)); }
+      this.regions.push({id,group:r.group,c:[cx,cy,cz],r:Math.max(10,rad)}); }
+
+    // Пучки волокон между областями (кривые Безье)
+    const tract=(f,t,n,bow)=>{
+      const A=reg[f],B=reg[t]; const strands=[], pp=[];
+      const pick=(L)=>{ const o=[]; for(let q=0;q<3;q++) o.push(L[Math.floor(R()*L.length)]); return o; };
+      const aa=pick(A.idx), bb=pick(B.idx);
+      n=Math.ceil(n*.6);
+      for(let k=0;k<n;k++){
+        const a=this.neurons[aa[k%3]], b=this.neurons[bb[Math.floor(k/3)%3]];
+        const j=()=>(R()-.5)*1.8;
+        const P=[[a.x,a.y,a.z],
+          [a.x+(b.x-a.x)*.33+bow[0]*1.1+j(),a.y+(b.y-a.y)*.33+bow[1]*1.1+j(),a.z+(b.z-a.z)*.33+bow[2]*1.1+j()],
+          [a.x+(b.x-a.x)*.66+bow[0]*.9+j(),a.y+(b.y-a.y)*.66+bow[1]*.9+j(),a.z+(b.z-a.z)*.66+bow[2]*.9+j()],
+          [b.x,b.y,b.z]];
+        const pts=[]; for(let i=0;i<=14;i++) pts.push(bez(P,i/14));
+        strands.push(pts); pp.push(pts.map(()=>({x:0,y:0,depth:0,scale:1})));
+      }
+      this.tracts.push({gFrom:A.group,gTo:B.group,strands,pp});
+    };
+    for(const s of [-1,1]){ const sd=s<0?'L':'R';
+      tract('ant'+sd,'al'+sd,6,[s*4,-6,6]);
+      tract('al'+sd,'cal'+sd,14,[s*10,22,-14]);
+      tract('al'+sd,'lh'+sd,8,[s*14,10,2]);
+      tract('cal'+sd,'ped'+sd,6,[-s*4,0,2]);
+      tract('ped'+sd,'mbl'+sd,8,[-s*3,2,4]);
+      tract('mbl'+sd,'cx',8,[-s*6,-10,-8]);
+      tract('lh'+sd,'cx',6,[s*6,16,-6]);
+    }
+    tract('mblL','mblR',4,[0,-10,6]); tract('alL','alR',4,[0,-8,8]); tract('calL','calR',3,[0,20,0]);
+
+    // Короткие волоконца внутри областей (ветвление)
+    for(const id in reg){ const l=reg[id].idx;
+      for(const a of l){ const A=this.neurons[a];
+        const near=l.filter(b=>b!==a).map(b=>[b,(A.x-this.neurons[b].x)**2+(A.y-this.neurons[b].y)**2+(A.z-this.neurons[b].z)**2]).sort((u,v)=>u[1]-v[1]).slice(0,2);
+        for(const [b,d2] of near){ if(b<a && R()<.6) continue; const B=this.neurons[b], d=Math.sqrt(d2), k=.28*d;
+          this.intra.push({a,b,g:A.group,c:[(A.x+B.x)/2+(R()-.5)*k*2,(A.y+B.y)/2+(R()-.5)*k*2,(A.z+B.z)/2+(R()-.5)*k*2],cp:{x:0,y:0,depth:0,scale:1}}); }
+      } }
+
+    for(const g in GROUPS) this.sprites[g]=this.sprite(GROUPS[g].color);
+    this.sprites.hub=this.sprite('#e6f6ff'); this.sprites.optic=this.sprite('#6d83ff'); this.sprites.shell=this.sprite('#3b82f6');
+    this.blobs=[{c:[-28,6,-4],r:46,a:.13,sp:'shell'},{c:[28,6,-4],r:46,a:.13,sp:'shell'},{c:[0,4,-6],r:52,a:.08,sp:'shell'},
+      {c:[-74,0,-8],r:30,a:.16,sp:'optic'},{c:[74,0,-8],r:30,a:.16,sp:'optic'}];
+    this.bproj={x:0,y:0,depth:0,scale:1};
+    const mk=()=>({x:0,y:0,depth:0,scale:1});
+    this.proj=this.neurons.map(mk); this.dproj=this.dust.map(mk); this.mproj=this.motes.map(mk);
+    this.regProj=this.regions.map(mk); this.center=mk();
+    $('cNeurons').textContent=this.neurons.length; $('cHubs').textContent=this.hubs.length;
+  },
+  sprite(color){
+    const s=64,c=document.createElement('canvas'); c.width=c.height=s; const g=c.getContext('2d'),[r,gg,b]=hexToRgb(color);
+    const gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+    gr.addColorStop(0,`rgba(${r},${gg},${b},1)`); gr.addColorStop(.18,`rgba(${r},${gg},${b},.75)`);
+    gr.addColorStop(.5,`rgba(${r},${gg},${b},.2)`); gr.addColorStop(1,`rgba(${r},${gg},${b},0)`);
+    g.fillStyle=gr; g.fillRect(0,0,s,s); return c;
+  },
+  setActivity(map){ for(const k in map) if(k in this.target) this.target[k]=clamp(map[k],0,1); },
+  doFlash(kind){ this.flash=kind; this.flashUntil=performance.now()+650; },
+  resize(w,h){ this.W=w; this.H=h; this.pxu=clamp(Math.min(w/190,h/132),2.2,7); },
+  project(x,y,z,o){
+    const x1=x*this.cY+z*this.sY, z1=-x*this.sY+z*this.cY;
+    const y2=y*this.cX-z1*this.sX, z2=y*this.sX+z1*this.cX, d=this.camZ/(this.camZ+z2);
+    o.x=this.W/2+x1*d*this.pxu; o.y=this.H/2-y2*d*this.pxu; o.depth=z2; o.scale=d; return o;
+  },
+
+  /* ---------- ОБНОВЛЕНИЕ ---------- */
+  update(dt){
+    const k=Math.min(1,dt*4);
+    for(const g in this.target) this.activity[g]+=(this.target[g]-this.activity[g])*k;
+    if(!REDUCED){ this.rotation+=this.rotSpeed*dt;
+      for(const m of this.motes){ m.x+=m.vx*dt; m.y+=m.vy*dt; m.z+=m.vz*dt; if(m.x*m.x+m.y*m.y+m.z*m.z>16000){ m.x*=-.9; m.y*=-.9; m.z*=-.9; } } }
+    for(const tr of this.tracts){
+      const act=(this.activity[tr.gFrom]+this.activity[tr.gTo])/2;
+      if(act>.3 && Math.random()<act*dt*2.4 && this.packets.length<100) this.packets.push({tr,s:Math.floor(Math.random()*tr.strands.length),t:0,sp:.3+Math.random()*.4});
+    }
+    for(let i=this.packets.length-1;i>=0;i--){ this.packets[i].t+=this.packets[i].sp*dt; if(this.packets[i].t>=1) this.packets.splice(i,1); }
+  },
+
+  /* ---------- РИСОВАНИЕ ---------- */
+  render(ctx,time){
+    this.tiltEff=this.tilt+(REDUCED?0:Math.sin(time*.25)*.05);
+    this.cY=Math.cos(this.rotation); this.sY=Math.sin(this.rotation); this.cX=Math.cos(this.tiltEff); this.sX=Math.sin(this.tiltEff);
+    const N=this.neurons, P=this.proj, u=this.pxu/4.5, fog=z=>clamp(.62-z/200,.22,1);
+    for(let i=0;i<N.length;i++) this.project(N[i].x,N[i].y,N[i].z,P[i]);
+    for(let i=0;i<this.dust.length;i++){ const d=this.dust[i]; this.project(d.x,d.y,d.z,this.dproj[i]); }
+    for(let i=0;i<this.motes.length;i++){ const m=this.motes[i]; this.project(m.x,m.y,m.z,this.mproj[i]); }
+    this.regions.forEach((r,i)=>this.project(r.c[0],r.c[1],r.c[2],this.regProj[i]));
+    for(const e of this.intra) this.project(e.c[0],e.c[1],e.c[2],e.cp);
+    for(const tr of this.tracts) tr.strands.forEach((s,si)=>s.forEach((p,pi)=>this.project(p[0],p[1],p[2],tr.pp[si][pi])));
+    this.project(0,0,0,this.center);
+
+    let avg=0,cnt=0; for(const g in this.activity){ if(g!=='fill'){ avg+=this.activity[g]; cnt++; } } avg/=cnt;
+
+    // мягкое свечение позади мозга
+    ctx.globalCompositeOperation='lighter';
+    const sz=this.pxu*190; ctx.globalAlpha=.14+avg*.16; ctx.drawImage(this.sprites.shell,this.center.x-sz/2,this.center.y-sz/2,sz,sz);
+
+    // объём: полушария и оптические доли (мягкие облака)
+    for(const b of this.blobs){ const p=this.bproj; this.project(b.c[0],b.c[1],b.c[2],p); const z=this.pxu*b.r*2*p.scale;
+      ctx.globalAlpha=clamp((b.a+avg*.08)*fog(p.depth),0,1); ctx.drawImage(this.sprites[b.sp],p.x-z/2,p.y-z/2,z,z); }
+    // силуэт-«пыль»
+    ctx.fillStyle='#9ccaff';
+    for(let i=0;i<this.dust.length;i++){ const d=this.dust[i],p=this.dproj[i]; const tw=.85+.15*Math.sin(time*.9+d.ph);
+      let rim=.45; if(d.nx||d.ny||d.nz){ const z1=-d.nx*this.sY+d.nz*this.cY, z2=d.ny*this.sX+z1*this.cX; rim=.2+.8*Math.pow(1-Math.abs(z2),1.6); }
+      ctx.globalAlpha=clamp(d.a*fog(p.depth)*tw*rim*1.3,0,1); const s=d.s*p.scale*u; ctx.fillRect(p.x-s/2,p.y-s/2,s,s); }
+    ctx.fillStyle='#cfe6ff';
+    for(let i=0;i<this.motes.length;i++){ const p=this.mproj[i]; ctx.globalAlpha=.3*fog(p.depth); ctx.fillRect(p.x,p.y,1.4,1.4); }
+
+    // свечение областей
+    this.regions.forEach((r,i)=>{ const p=this.regProj[i],act=this.activity[r.group]||0,s=r.r*this.pxu*3*p.scale;
+      ctx.globalAlpha=clamp((.05+act*.22)*fog(p.depth),0,1); ctx.drawImage(this.sprites[r.group],p.x-s/2,p.y-s/2,s,s); });
+
+    // короткие волоконца
+    ctx.lineCap='round';
+    const byG={}; for(const e of this.intra) (byG[e.g] ||= []).push(e);
+    for(const g in byG){ const act=this.activity[g]||0,[r,gr,b]=hexToRgb(GROUPS[g].color);
+      ctx.globalAlpha=1; ctx.strokeStyle=`rgba(${r},${gr},${b},${.1+act*.25})`; ctx.lineWidth=.6*u; ctx.beginPath();
+      for(const e of byG[g]){ const a=P[e.a],b2=P[e.b]; ctx.moveTo(a.x,a.y); ctx.quadraticCurveTo(e.cp.x,e.cp.y,b2.x,b2.y); }
+      ctx.stroke(); }
+
+    // пучки волокон: первая половина цвета «откуда», вторая — «куда»
+    ctx.lineJoin='round';
+    for(const tr of this.tracts){
+      const act=(this.activity[tr.gFrom]+this.activity[tr.gTo])/2;
+      for(const half of [0,1]){
+        const g=half?tr.gTo:tr.gFrom, [r,gr,b]=hexToRgb(GROUPS[g].color), a0=half?7:0, a1=half?14:7;
+        for(const pass of [0,1]){
+          ctx.strokeStyle=`rgba(${r},${gr},${b},${pass?.18+act*.5:.03+act*.07})`; ctx.lineWidth=(pass?.8+act*.7:4+act*4)*u; ctx.beginPath();
+          for(const s of tr.pp){ ctx.moveTo(s[a0].x,s[a0].y); for(let i=a0+1;i<=a1;i++) ctx.lineTo(s[i].x,s[i].y); }
+          ctx.stroke();
+        }
+      }
+    }
+
+    // обычные нейроны
+    for(let i=0;i<N.length;i++){ const n=N[i]; if(n.hub) continue; const p=P[i],act=this.activity[n.group]||0,f=fog(p.depth);
+      const pulse=.8+.2*Math.sin(time*2+n.phase), s=(n.size*7+act*4)*p.scale*u;
+      ctx.globalAlpha=clamp((.55+act*.45)*f*pulse,0,1); ctx.drawImage(this.sprites[n.group],p.x-s/2,p.y-s/2,s,s);
+      const c=Math.max(1.4,n.size*1.1*p.scale*u); ctx.globalAlpha=clamp(.8*f,0,1); ctx.fillStyle='#fff'; ctx.fillRect(p.x-c/2,p.y-c/2,c,c); }
+
+    // hub-нейроны: ореол, ядро, расходящаяся «волна»
+    for(let i=0;i<N.length;i++){ const n=N[i]; if(!n.hub) continue; const p=P[i],act=this.activity[n.group]||0,f=fog(p.depth);
+      const br=.92+.08*Math.sin(time*1.8+n.phase), halo=(n.size*7.5+act*10)*p.scale*u*br;
+      ctx.globalAlpha=clamp((.45+act*.45)*f,0,1); ctx.drawImage(this.sprites[n.group],p.x-halo/2,p.y-halo/2,halo,halo);
+      const core=n.size*3*p.scale*u; ctx.globalAlpha=clamp(.85*f+.15,0,1); ctx.drawImage(this.sprites.hub,p.x-core/2,p.y-core/2,core,core);
+      if(act>.35){ const t=REDUCED?.5:((time*.7+n.phase)%1), rr=(n.size*2.5+t*n.size*7)*p.scale*u, [r,gr,b]=hexToRgb(GROUPS[n.group].color);
+        ctx.globalAlpha=1; ctx.strokeStyle=`rgba(${r},${gr},${b},${(1-t)*act*.7*f})`; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(p.x,p.y,rr,0,6.283); ctx.stroke(); }
+    }
+
+    // бегущие сигналы со шлейфом
+    for(const pk of this.packets){ const s=pk.tr.pp[pk.s], g=pk.t<.5?pk.tr.gFrom:pk.tr.gTo;
+      for(let k=0;k<5;k++){ const tt=pk.t-k*.03; if(tt<0) break; const fi=tt*14, i0=Math.min(13,Math.floor(fi)), fr=fi-i0, a=s[i0], b=s[i0+1];
+        const x=a.x+(b.x-a.x)*fr, y=a.y+(b.y-a.y)*fr, env=Math.sin(Math.PI*clamp(tt,0,1)), sz=(11-k*1.6)*u;
+        ctx.globalAlpha=clamp(env*(1-k/5)*.95,0,1); ctx.drawImage(this.sprites[g],x-sz/2,y-sz/2,sz,sz); } }
+
+    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+    if(this.hover>=0){ const p=P[this.hover]; ctx.strokeStyle='rgba(220,240,255,.95)'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.arc(p.x,p.y,15,0,6.283); ctx.stroke(); }
+  }
+};
+
+/* Холст, размеры, вспышки фона */
+const canvas=$('brain'), ctx=canvas.getContext('2d');
+function resizeCanvas(){
+  const c=$('stage'), w=c.clientWidth, h=c.clientHeight, dpr=window.devicePixelRatio||1;
+  if(!w||!h) return;
+  canvas.width=w*dpr; canvas.height=h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); Brain3D.resize(w,h);
+}
+new ResizeObserver(resizeCanvas).observe($('stage'));
+
+function drawBackground(time){
+  const {W,H}=Brain3D;
+  const g=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*.75);
+  g.addColorStop(0,'#06142a'); g.addColorStop(1,'#01030a'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  const left=Brain3D.flashUntil-performance.now();
+  if(Brain3D.flash && left>0){
+    const col=Brain3D.flash==='danger'?'251,113,133':'52,211,153', a=.28*(left/650);
+    const f=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*.8);
+    f.addColorStop(0,`rgba(${col},${a*.5})`); f.addColorStop(1,`rgba(${col},${a})`); ctx.fillStyle=f; ctx.fillRect(0,0,W,H);
+  }
+}
+
+/* Мышь и пальцы: вращение + подсказка только на hub-нейронах */
+let drag=null;
+canvas.addEventListener('pointerdown',e=>{ drag={x:e.clientX,y:e.clientY}; Brain3D.rotSpeed=0; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove',e=>{
+  const r=canvas.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+  if(drag){
+    Brain3D.rotation+=(e.clientX-drag.x)*.008; Brain3D.tilt=clamp(Brain3D.tilt+(e.clientY-drag.y)*.005,-1.2,1.2);
+    drag.x=e.clientX; drag.y=e.clientY; return;
+  }
+  let best=-1,bd=1e9;
+  for(const h of Brain3D.hubs){ const p=Brain3D.proj[h.idx], d=Math.hypot(p.x-mx,p.y-my); if(d<20&&d<bd){bd=d;best=h.idx;} }
+  Brain3D.hover=best; showTip();
+});
+const endDrag=()=>{ drag=null; Brain3D.rotSpeed=.12; };
+canvas.addEventListener('pointerup',endDrag); canvas.addEventListener('pointercancel',endDrag);
+canvas.addEventListener('pointerleave',()=>{ Brain3D.hover=-1; showTip(); });
+
+function showTip(){
+  const t=$('tip'), i=Brain3D.hover;
+  if(i<0){ t.classList.remove('on'); return; }
+  const n=Brain3D.neurons[i], g=GROUPS[n.group], p=Brain3D.proj[i], act=Math.round((Brain3D.activity[n.group]||0)*100);
+  t.innerHTML=`<b style="color:${g.color}">${n.name} · ${g.title}</b><span>${g.role}</span><br><span>Активность: ${act}%</span>`;
+  t.style.left=clamp(p.x+16,8,Brain3D.W-250)+'px'; t.style.top=clamp(p.y-20,8,Brain3D.H-90)+'px'; t.classList.add('on');
+}
+
+let lastT=0;
+function frame(now){
+  const dt=Math.min(.05,(now-lastT)/1000||.016); lastT=now;
+  if(Brain3D.W){ Brain3D.update(dt); drawBackground(now/1000); Brain3D.render(ctx,now/1000);
+    if(Brain3D.hover>=0) showTip();
+    document.querySelectorAll('#legend div').forEach(d=>d.classList.toggle('on',(Brain3D.activity[d.dataset.g]||0)>.3)); }
+  requestAnimationFrame(frame);
+}
+
+/* =====================================================================
+   ЧАСТЬ 4. ЭТАПЫ СТЕНДА
+   ===================================================================== */
+const state = { src:'camera', trained:false, threshold:.15, val:[], hist:[], results:[], prevKc:[], novHist:[], ovHist:[] };
+let seed = 2024, current=-1, unlocked=0;
+
+const STAGES=[
+  {n:'0',t:'Старт',  go:sIntro},
+  {n:'1',t:'Вход',   go:sOrn},
+  {n:'2',t:'Код',    go:sKc},
+  {n:'3',t:'Память', go:sMbon},
+  {n:'4',t:'Обучение',go:sTrain},
+  {n:'5',t:'Детекция',go:sDetect},
+  {n:'6',t:'Итог',   go:sSummary}
+];
+
+function buildStepper(){
+  const s=$('stepper'); s.innerHTML='';
+  STAGES.forEach((st,i)=>{
+    if(i){ const d=document.createElement('div'); d.className='bar-sep'; s.appendChild(d); }
+    const b=document.createElement('button'); b.className='step'; b.innerHTML=`<span class="n">${st.n}</span><span class="t">${st.t}</span>`;
+    b.addEventListener('click',()=>{ if(i<=unlocked) goTo(i); }); s.appendChild(b);
+  });
+}
+function updStepper(){
+  document.querySelectorAll('.step').forEach((b,i)=>{ b.classList.toggle('active',i===current); b.classList.toggle('done',i<current); b.classList.toggle('reach',i<=unlocked); b.disabled=i>unlocked; });
+  document.querySelectorAll('.bar-sep').forEach((b,i)=>b.classList.toggle('done',i<current));
+}
+function goTo(n){
+  TIMER.clear(); runId++; current=n; unlocked=Math.max(unlocked,n); updStepper();
+  $('panel').scrollTop=0; STAGES[n].go();
+}
+function setPanel(h){ $('panel').innerHTML=h; }
+function setStatus(t,c='var(--cyan)'){ $('statusText').textContent=t; $('status').style.color=c; }
+function setActions(list){
+  const a=$('actions'); a.innerHTML='';
+  for(const b of list){ const el=document.createElement('button'); el.className='btn '+(b.cls||''); el.innerHTML=b.label; el.disabled=!!b.disabled; el.addEventListener('click',b.fn); a.appendChild(el); }
+}
+const head=(n,t,lead)=>`<div class="head"><span class="num">${n}</span><span class="title">${t}</span></div><p class="lead">${lead}</p>`;
+const chips=()=>`<div class="chips">${Object.entries(SOURCES).map(([k,v])=>`<button class="chip ${v.truth==='DANGER'?'atk':''} ${k===state.src?'on':''}" data-src="${k}">${v.label}</button>`).join('')}</div>`;
+function bindChips(){
+  document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{
+    state.src=b.dataset.src; document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b)); state.prevKc=[]; state.ovHist=[]; state.novHist=[];
+  }));
+}
+function updKcCounter(){ $('cKc').textContent=FlyBrain.kcIdx.length+' / '+N_KC; }
+
+/* ---------- 0. СТАРТ ---------- */
+function sIntro(){
+  setStatus('ОЖИДАНИЕ','var(--muted)');
+  Brain3D.setActivity({ant:.15,al:.15,calyx:.15,mblobes:.15,lh:.15,cx:.15}); updKcCounter();
+  setPanel(head('00','Мозг мухи как сигнализация','Я взял идею из мозга мухи-дрозофилы и научил её замечать подозрительный трафик умных устройств.')+`
+  <div class="stack">
+    <div class="card"><h3>Как это работает</h3>
+      <ul class="list">
+        <li style="--c:var(--cyan)"><b>Вход.</b> Устройство (камера, замок…) шлёт 40 чисел о своём трафике.</li>
+        <li style="--c:var(--blue)"><b>Код.</b> Мозг превращает их в «отпечаток» — 20 активных клеток из 400.</li>
+        <li style="--c:var(--violet)"><b>Память.</b> Знакомые отпечатки он запоминает и «затихает». Незнакомые — тревога.</li>
+      </ul></div>
+    <div class="card"><h3>Что на экране</h3>
+      <ul class="list">
+        <li style="--c:var(--text)">Крупные светящиеся шары — <b>hub-нейроны</b> (наведите — увидите название).</li>
+        <li style="--c:var(--text)">Пучки светящихся волокон — по ним бегут <b>сигналы</b>.</li>
+        <li style="--c:var(--text)">Мозг можно <b>вращать</b> мышью или пальцем.</li>
+      </ul></div>
+  </div>`);
+  setActions([{label:'▶ Начать',cls:'primary',fn:()=>goTo(1)}]);
+}
+
+/* ---------- 1. ВХОД ---------- */
+function sOrn(){
+  setStatus('ВХОД: 40 ПРИЗНАКОВ');
+  Brain3D.setActivity({ant:1,al:.9,calyx:.15,mblobes:.1,lh:.15,cx:.1});
+  setPanel(head('01','Вход и Antennal Lobe','Антенны принимают 40 чисел. Antennal Lobe выравнивает их «громкость», чтобы мощный сигнал не заглушал остальные.')+`
+  <div class="stack">
+    <div class="card"><h3>Источник трафика <span class="live">LIVE</span></h3>${chips()}
+      ${FEATURES.map((f,i)=>`<div class="feat"><span class="fn">${f.name}</span><div class="meter"><i id="fb${i}"></i></div><span class="fv" id="fv${i}">—</span></div>`).join('')}
+      <div class="note">Ещё 34 признака — фоновые счётчики (шум).</div></div>
+    <div class="card"><h3>После Antennal Lobe · 40 ORN</h3>
+      <div class="chart"><canvas id="ornC"></canvas></div>
+      <div class="note">Голубые столбики — 6 главных признаков, синие — фон.</div></div>
+  </div>`);
+  bindChips();
+  const tick=()=>{
+    const raw=IoT.sample(state.src); FlyBrain.run(raw);
+    FEATURES.forEach((f,i)=>{ $('fv'+i).textContent=fmt(raw[i]); $('fb'+i).style.width=clamp(FlyBrain.x[i]/1.2*100,2,100)+'%'; });
+    drawBars('ornC',Array.from(FlyBrain.orn).map(v=>Math.max(0,v)),N_INFO); updKcCounter();
+  };
+  tick(); TIMER.every(tick,900);
+  setActions([{label:'← Назад',fn:()=>goTo(0)},{label:'Дальше →',cls:'primary',fn:()=>goTo(2)}]);
+}
+
+/* ---------- 2. KENYON CELLS ---------- */
+function sKc(){
+  setStatus('РАЗРЕЖЕННЫЙ КОД','var(--blue)');
+  Brain3D.setActivity({ant:.5,al:.6,calyx:1,mblobes:.25,lh:.15,cx:.1});
+  state.prevKc=[]; state.ovHist=[];
+  setPanel(head('02','Kenyon cells · отпечаток','400 клеток смотрят на вход, но «побеждают» только 20 сильнейших. Это и есть отпечаток события.')+`
+  <div class="stack">
+    <div class="card"><h3>Карта 400 клеток <span class="live">LIVE</span></h3>${chips()}
+      <div class="kcgrid" id="kcg">${'<i></i>'.repeat(N_KC)}</div>
+      <div class="keys"><span style="--c:var(--blue)">активна</span><span style="--c:rgba(96,165,250,.25)">молчит</span></div>
+      <div class="metrics">
+        <div class="metric warn"><small>Активных</small><b id="m1">—</b></div>
+        <div class="metric warn"><small>Разреженность</small><b>5%</b></div>
+        <div class="metric"><small>Совпадение с прошлым</small><b id="m3">—</b></div>
+      </div></div>
+    <div class="card"><h3>Похож ли отпечаток на предыдущий?</h3>
+      <div class="chart"><div class="lbl">100% = тот же отпечаток</div><canvas id="ovC"></canvas></div>
+      <div class="note">Тот же источник → отпечатки почти совпадают. Переключите источник — совпадение падает.</div></div>
+  </div>`);
+  bindChips();
+  const cells=document.querySelectorAll('#kcg i');
+  const tick=()=>{
+    FlyBrain.run(IoT.sample(state.src));
+    const set=new Set(FlyBrain.kcIdx); cells.forEach((c,i)=>c.classList.toggle('on',set.has(i)));
+    let ov=null; if(state.prevKc.length){ ov=state.prevKc.filter(j=>set.has(j)).length/KC_ACTIVE; state.ovHist.push(ov); if(state.ovHist.length>40) state.ovHist.shift(); }
+    state.prevKc=[...FlyBrain.kcIdx];
+    $('m1').textContent=FlyBrain.kcIdx.length+'/'+N_KC; $('m3').textContent=ov==null?'—':Math.round(ov*100)+'%';
+    drawLine('ovC',[state.ovHist],{colors:['#60a5fa']}); updKcCounter();
+  };
+  tick(); TIMER.every(tick,900);
+  setActions([{label:'← Назад',fn:()=>goTo(1)},{label:'Дальше →',cls:'primary',fn:()=>goTo(3)}]);
+}
+
+/* ---------- 3. MBON ---------- */
+function sMbon(){
+  setStatus('ПАМЯТЬ: ЗНАКОМО ИЛИ НОВО','var(--violet)');
+  Brain3D.setActivity({ant:.3,al:.35,calyx:.6,mblobes:1,lh:.3,cx:.4});
+  state.novHist=[];
+  setPanel(head('03','MBON · память','Выходной нейрон смотрит на 20 активных клеток. Если все они «знакомы», он молчит. Если нет — шумит: «Новое!».')+`
+  <div class="stack">
+    <div class="card"><h3>Новизна образца <span class="live">LIVE</span></h3>${chips()}
+      <div class="gauge"><div class="fill" id="gf"></div><div class="thr" id="gt"></div><div class="val" id="gv">—</div></div>
+      <div class="metrics">
+        <div class="metric good"><small>Знакомо</small><b id="mk">—</b></div>
+        <div class="metric bad"><small>Ново</small><b id="mn">—</b></div>
+        <div class="metric violet"><small>Память занята</small><b id="mm">—</b></div>
+      </div>
+      <div class="note" id="mnote"></div></div>
+    <div class="card"><h3>Новизна по времени</h3>
+      <div class="chart"><canvas id="novC"></canvas></div></div>
+  </div>`);
+  bindChips();
+  const tick=()=>{
+    const nov=FlyBrain.run(IoT.sample(state.src));
+    $('gf').style.width=(nov*100)+'%'; $('gf').style.setProperty('--gw',$('gf').parentElement.clientWidth+'px');
+    $('gt').style.left=(state.threshold*100)+'%'; $('gv').textContent=nov.toFixed(2);
+    $('mk').textContent=((1-nov)*100).toFixed(0)+'%'; $('mn').textContent=(nov*100).toFixed(0)+'%'; $('mm').textContent=FlyBrain.memoryUsed()+'/'+N_KC;
+    $('mnote').textContent = FlyBrain.memoryUsed()===0 ? 'Память пуста: для мозга всё ново (1.00). Это нормально — сейчас обучим.' : 'Белая черта — порог тревоги.';
+    state.novHist.push(nov); if(state.novHist.length>40) state.novHist.shift();
+    drawLine('novC',[state.novHist],{colors:['#a78bfa'],refLine:state.threshold}); updKcCounter();
+  };
+  tick(); TIMER.every(tick,900);
+  setActions([{label:'← Назад',fn:()=>goTo(2)},{label:'К обучению →',cls:'primary',fn:()=>goTo(4)}]);
+}
+
+/* ---------- 4. ОБУЧЕНИЕ ---------- */
+function sTrain(){
+  setStatus(state.trained?'ОБУЧЕН':'ГОТОВ К ОБУЧЕНИЮ',state.trained?'var(--green)':'var(--cyan)');
+  Brain3D.setActivity({ant:.2,al:.25,calyx:.3,mblobes:.3,lh:.15,cx:.2});
+  if(!state.val.length){ state.val=[]; for(const p of PROFILES) for(let i=0;i<10;i++) state.val.push(IoT.normal(p)); }
+  setPanel(head('04','Обучение на нормальном трафике','Мозг видит только обычную работу камеры, замка и хаба. Каждый знакомый отпечаток «глушит» свои клетки в памяти. Атак он ещё не видел.')+`
+  <div class="stack">
+    <div class="card"><h3>Прогресс <span class="live">LIVE</span></h3>
+      <div class="progress"><i id="pf"></i><span id="pl">0 / 12</span></div>
+      <div class="metrics">
+        <div class="metric violet"><small>Память занята</small><b id="t1">0/${N_KC}</b></div>
+        <div class="metric warn"><small>Новизна нормы</small><b id="t2">—</b></div>
+        <div class="metric"><small>Образцов</small><b id="t3">0</b></div>
+      </div>
+      <div class="chart" style="margin-top:10px"><div class="lbl">Новизна нормального трафика (падает = мозг учится)</div><canvas id="trC"></canvas></div></div>
+    <div class="card"><h3>Журнал</h3><div class="log" id="tlog"><div>Ожидание запуска…</div></div></div>
+  </div>`);
+  const log=(t,c)=>{ const l=$('tlog'),d=document.createElement('div'); if(c)d.className=c; d.textContent='> '+t; l.appendChild(d); l.scrollTop=l.scrollHeight; };
+  const paint=()=>{
+    const ep=state.hist.length;
+    $('pf').style.width=(ep/12*100)+'%'; $('pl').textContent=ep+' / 12'; $('t1').textContent=FlyBrain.memoryUsed()+'/'+N_KC;
+    $('t2').textContent=ep?state.hist[ep-1].toFixed(2):'—'; $('t3').textContent=ep*30; drawLine('trC',[state.hist],{colors:['#22d3ee'],min:0,max:1});
+  };
+  async function run(){
+    const my=runId; FlyBrain.forget(); state.hist=[]; state.trained=false; state.results=[];
+    $('tlog').innerHTML=''; log('Старт: 12 проходов по 30 свежих нормальных образцов','warn');
+    setActions([{label:'← Назад',fn:()=>goTo(3)},{label:'Идёт обучение…',cls:'primary',disabled:true}]);
+    for(let ep=1;ep<=12;ep++){
+      trainEpoch(10);
+      const sc=state.val.map(s=>FlyBrain.run(s)); const avg=sc.reduce((a,b)=>a+b,0)/sc.length;
+      state.hist.push(avg); updKcCounter();
+      Brain3D.setActivity({ant:.4,al:.6,calyx:.9,mblobes:.5+.5*avg,lh:.3,cx:.3});
+      paint(); log(`Проход ${ep}: новизна нормы = ${avg.toFixed(2)}, память ${FlyBrain.memoryUsed()}/${N_KC}`, ep<4?'warn':'ok');
+      await sleep(REDUCED?30:260); if(my!==runId) return;
+    }
+    const sc=state.val.map(s=>FlyBrain.run(s)); state.threshold=calibrateThreshold(sc); state.trained=true;
+    log(`✓ Готово. Порог тревоги выбран автоматически: ${state.threshold.toFixed(2)}`,'ok');
+    setStatus('ОБУЧЕН','var(--green)'); Brain3D.setActivity({ant:.15,al:.2,calyx:.2,mblobes:.15,lh:.1,cx:.15});
+    finish();
+  }
+  function finish(){
+    setActions([{label:'← Назад',fn:()=>goTo(3)},{label:'Переобучить',fn:run},{label:'К детекции →',cls:'primary',fn:()=>goTo(5)}]);
+  }
+  if(state.trained){ paint(); log('Мозг уже обучен. Порог: '+state.threshold.toFixed(2),'ok'); finish(); }
+  else setActions([{label:'← Назад',fn:()=>goTo(3)},{label:'▶ Начать обучение',cls:'primary',fn:run}]);
+}
+
+/* ---------- 5. ДЕТЕКЦИЯ ---------- */
+function sDetect(){
+  setStatus('ДЕТЕКЦИЯ');
+  Brain3D.setActivity({ant:.2,al:.25,calyx:.25,mblobes:.2,lh:.15,cx:.2});
+  setPanel(head('05','Детекция атак','Подайте образец сами или запустите автотест из 24 образцов. Белая черта — порог: выше неё мозг объявляет тревогу.')+`
+  <div class="stack">
+    <div class="verdict" id="verdict"><div class="big">—</div><div class="small">ожидание образца</div></div>
+    <div class="card"><h3>Подать образец</h3>
+      <div class="row">
+        <button class="btn small" data-k="camera">Камера</button><button class="btn small" data-k="lock">Замок</button><button class="btn small" data-k="hub">Хаб</button>
+        <button class="btn small atk" data-k="portscan">Скан портов</button><button class="btn small atk" data-k="exfil">Утечка</button><button class="btn small atk" data-k="beacon">Маяк C2</button>
+      </div>
+      <div class="gauge"><div class="fill" id="df"></div><div class="thr" id="dt"></div><div class="val" id="dv">—</div></div>
+      <div class="slider"><label>Порог тревоги <b id="thv"></b></label>
+        <input type="range" id="thr" min="0.05" max="0.95" step="0.01">
+        <div class="note">Ниже порог — больше ложных тревог. Выше — риск пропустить атаку.</div></div></div>
+    <div class="card"><h3>Итоги проверки</h3>
+      <div class="confusion"><div class="tp"><small>Атака поймана</small><b id="cTP">0</b></div><div class="fp"><small>Ложная тревога</small><b id="cFP">0</b></div>
+      <div class="fn"><small>Атака пропущена</small><b id="cFN">0</b></div><div class="tn"><small>Норма пропущена верно</small><b id="cTN">0</b></div></div>
+      <div class="metrics"><div class="metric good"><small>Точность</small><b id="cA">—</b></div><div class="metric warn"><small>Precision</small><b id="cP">—</b></div><div class="metric"><small>Recall</small><b id="cR">—</b></div></div></div>
+    <div class="card"><h3>Журнал</h3><div class="log" id="dlog"><div>Образцов пока нет.</div></div></div>
+  </div>`);
+  const thr=$('thr'); thr.value=state.threshold;
+  const log=(t,c)=>{ const l=$('dlog'); if(!state.results.length||l.firstChild?.dataset.empty) l.innerHTML=''; const d=document.createElement('div'); if(c)d.className=c; d.textContent='> '+t; l.appendChild(d); l.scrollTop=l.scrollHeight; };
+  const verdictOf=sc=>sc>state.threshold?'DANGER':'SAFE';
+  function counts(){
+    let TP=0,FP=0,FN=0,TN=0;
+    for(const r of state.results){ const d=verdictOf(r.score)==='DANGER', t=r.truth==='DANGER'; if(t&&d)TP++; else if(!t&&d)FP++; else if(t&&!d)FN++; else TN++; }
+    return {TP,FP,FN,TN};
+  }
+  function paintStats(){
+    const {TP,FP,FN,TN}=counts(), n=TP+FP+FN+TN;
+    $('cTP').textContent=TP;$('cFP').textContent=FP;$('cFN').textContent=FN;$('cTN').textContent=TN;
+    $('cA').textContent=n?Math.round((TP+TN)/n*100)+'%':'—'; $('cP').textContent=TP+FP?Math.round(TP/(TP+FP)*100)+'%':'—'; $('cR').textContent=TP+FN?Math.round(TP/(TP+FN)*100)+'%':'—';
+    $('thv').textContent=state.threshold.toFixed(2); $('dt').style.left=(state.threshold*100)+'%';
+  }
+  function show(kind,sc){
+    const danger=verdictOf(sc)==='DANGER', v=$('verdict');
+    v.className='verdict '+(danger?'danger':'safe');
+    v.innerHTML=`<div class="big">${danger?'⚠ ТРЕВОГА':'✓ НОРМА'}</div><div class="small">${SOURCES[kind].label} · новизна ${sc.toFixed(2)}</div>`;
+    $('df').style.width=(sc*100)+'%'; $('df').style.setProperty('--gw',$('df').parentElement.clientWidth+'px'); $('dv').textContent=sc.toFixed(2);
+    Brain3D.setActivity({ant:.5,al:.55,calyx:.6,mblobes:Math.max(.2,sc),lh:.4,cx:danger?1:.35});
+    Brain3D.doFlash(danger?'danger':'safe'); setStatus(danger?'ТРЕВОГА':'НОРМА',danger?'var(--red)':'var(--green)'); updKcCounter();
+  }
+  function addSample(kind){
+    const sc=FlyBrain.run(IoT.sample(kind)); state.results.push({kind,truth:SOURCES[kind].truth,score:sc});
+    if(state.results.length>300) state.results.shift();
+    show(kind,sc); paintStats();
+    const ok=verdictOf(sc)===SOURCES[kind].truth;
+    log(`${SOURCES[kind].label.padEnd(14)} новизна ${sc.toFixed(2)} → ${verdictOf(sc)==='DANGER'?'ТРЕВОГА':'норма'} ${ok?'✓':'✗'}`, ok?(SOURCES[kind].truth==='DANGER'?'bad':'ok'):'warn');
+  }
+  document.querySelectorAll('[data-k]').forEach(b=>b.addEventListener('click',()=>addSample(b.dataset.k)));
+  thr.addEventListener('input',()=>{ state.threshold=+thr.value; paintStats(); const last=state.results[state.results.length-1]; if(last) show(last.kind,last.score); });
+  paintStats();
+  async function auto(){
+    const my=runId; state.results=[]; $('dlog').innerHTML='';
+    const kinds=[]; for(const k of Object.keys(SOURCES)) for(let i=0;i<4;i++) kinds.push(k); shuffle(kinds);
+    setActions([{label:'← Назад',fn:()=>goTo(4)},{label:'Идёт тест…',cls:'primary',disabled:true}]);
+    for(const k of kinds){ addSample(k); await sleep(REDUCED?20:380); if(my!==runId) return; }
+    log('✓ Автотест завершён','ok'); setStatus('ДЕТЕКЦИЯ ЗАВЕРШЕНА','var(--green)'); idle();
+  }
+  function idle(){ setActions([{label:'← Назад',fn:()=>goTo(4)},{label:'▶ Автотест (24)',fn:auto},{label:'К итогам →',cls:'primary',fn:()=>goTo(6)}]); }
+  idle();
+}
+
+/* ---------- 6. ИТОГ ---------- */
+function sSummary(){
+  setStatus('ГОТОВО','var(--green)'); Brain3D.setActivity({ant:.3,al:.3,calyx:.35,mblobes:.3,lh:.25,cx:.35});
+  let TP=0,FP=0,FN=0,TN=0;
+  for(const r of state.results){ const d=r.score>state.threshold,t=r.truth==='DANGER'; if(t&&d)TP++; else if(!t&&d)FP++; else if(t&&!d)FN++; else TN++; }
+  const n=TP+FP+FN+TN, acc=n?Math.round((TP+TN)/n*100)+'%':'—';
+  setPanel(head('06','Итоги','Что получилось и что в модели настоящее, а что упрощено.')+`
+  <div class="stack">
+    <div class="card"><h3>Результаты</h3>
+      <div class="metrics">
+        <div class="metric good"><small>Точность</small><b>${acc}</b></div>
+        <div class="metric"><small>Образцов</small><b>${n}</b></div>
+        <div class="metric warn"><small>Порог</small><b>${state.threshold.toFixed(2)}</b></div>
+        <div class="metric violet"><small>Память</small><b>${FlyBrain.memoryUsed()}/${N_KC}</b></div>
+      </div></div>
+    <div class="two">
+      <div class="card"><h3 style="color:var(--green)">Как у настоящей мухи</h3><ul class="list">
+        <li style="--c:var(--green)">случайные связи вход → Kenyon cells</li>
+        <li style="--c:var(--green)">разреженный код (около 5% клеток)</li>
+        <li style="--c:var(--green)">обучение «глушением» знакомого</li>
+        <li style="--c:var(--green)">нет атак в обучении — детектор видит «новое»</li></ul></div>
+      <div class="card"><h3 style="color:var(--amber)">Упрощено</h3><ul class="list">
+        <li style="--c:var(--amber)">${Brain3D.neurons.length} нейронов, а у мухи 139 255</li>
+        <li style="--c:var(--amber)">трафик синтетический, не реальный</li>
+        <li style="--c:var(--amber)">3D-схема иллюстративна, не точная карта FlyWire</li>
+        <li style="--c:var(--amber)">Lateral Horn и Central Complex — наглядные блоки</li></ul></div>
+    </div>
+    <div class="note">Учебный стенд: это демонстрация идеи, а не готовая система защиты.</div>
+  </div>`);
+  setActions([{label:'← Назад',fn:()=>goTo(5)},{label:'⟳ Сначала',cls:'primary',fn:()=>resetAll(false)}]);
+}
+
+/* =====================================================================
+   ЧАСТЬ 5. ЗАПУСК И СБРОС
+   ===================================================================== */
+function resetAll(newSeed){
+  TIMER.clear(); runId++;
+  seed = newSeed ? Math.floor(Math.random()*1e6) : seed;
+  setSeed(seed); Brain3D.buildModel(); IoT.reset(); FlyBrain.init();
+  Object.assign(state,{src:'camera',trained:false,threshold:.15,val:[],hist:[],results:[],prevKc:[],novHist:[],ovHist:[]});
+  unlocked=0; current=-1; $('seedLabel').textContent='seed '+seed; goTo(0);
+}
+window.addEventListener('load',()=>{
+  $('legend').innerHTML=LEGEND.map(([g,t])=>`<div data-g="${g}"><b style="background:${GROUPS[g].color}"></b>${t}</div>`).join('');
+  resizeCanvas(); buildStepper(); resetAll(false);
+  $('btnReset').addEventListener('click',()=>resetAll(false));
+  $('btnNew').addEventListener('click',()=>resetAll(true));
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>
